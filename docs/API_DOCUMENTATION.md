@@ -1,4 +1,4 @@
-# MOI Mobile API Documentation
+#  Mobile API Documentation
 ## For Web Application Implementation
 
 ---
@@ -17,7 +17,7 @@
 
 ## Overview
 
-This API provides authentication and registration services for the Egyptian Ministry of Interior (MOI) mobile application. It supports both Egyptian citizens and foreign nationals with different registration flows.
+This API provides authentication and registration services for the  () mobile application. It supports both Egyptian citizens and foreign nationals with different registration flows.
 
 **Key Concepts:**
 - **Citizens (Egyptian)**: Use National ID (`cardId`) - `nationalityId = 26`
@@ -788,4 +788,4 @@ After successful registration, users need to activate their account:
 
 **End of Documentation**
 
-This document provides complete information for implementing the MOI registration and login system in a web application. All endpoints, payloads, responses, error handling, and validation rules are documented based on analysis of the decompiled Android APK.
+This document provides complete information for implementing the  registration and login system in a web application. All endpoints, payloads, responses, error handling, and validation rules are documented based on analysis of the decompiled Android APK.

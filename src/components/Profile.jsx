@@ -63,10 +63,10 @@ function Profile() {
     return (
       <div className="dashboard-container">
         <div className="dashboard-header">
-          <div className="logo-badge">MOI</div>
+          
           <div className="header-content">
-            <h1>وزارة الداخلية</h1>
-            <p>جمهورية مصر العربية</p>
+            <h1></h1>
+            <p></p>
           </div>
           <button onClick={handleLogout} className="btn-logout">
             تسجيل الخروج
@@ -91,10 +91,10 @@ function Profile() {
   return (
     <div className="dashboard-container">
       <div className="dashboard-header">
-        <div className="logo-badge">MOI</div>
+        
         <div className="header-content">
-          <h1>وزارة الداخلية</h1>
-          <p>جمهورية مصر العربية</p>
+          <h1></h1>
+          <p></p>
         </div>
         <button onClick={handleLogout} className="btn-logout">
           تسجيل الخروج

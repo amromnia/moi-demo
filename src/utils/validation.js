@@ -1,5 +1,5 @@
 /**
- * Validation utilities for MOI application forms
+ * Validation utilities for  application forms
  */
 
 /**

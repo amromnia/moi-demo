@@ -1,4 +1,4 @@
-/* Global Styles - MOI Application */
+/* Global Styles -  Application */
 
 * {
   margin: 0;
@@ -32,13 +32,13 @@ body {
 }
 
 a {
-  color: #667eea;
+  color: #2563eb;
   text-decoration: none;
   transition: color 0.2s ease;
 }
 
 a:hover {
-  color: #764ba2;
+  color: #1e40af;
 }
 
 button {

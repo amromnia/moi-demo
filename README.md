@@ -1,7 +1,7 @@
-# وزارة الداخلية - نظام التسجيل والدخول
-# MOI Registration & Login System
+#  - نظام التسجيل والدخول
+#  Registration & Login System
 
-A professional Arabic web application for the Egyptian Ministry of Interior (MOI) mobile application, implementing user authentication and registration services for both Egyptian citizens and foreign nationals.
+A professional Arabic web application for the  () mobile application, implementing user authentication and registration services for both Egyptian citizens and foreign nationals.
 
 ## 🌟 Features
 
@@ -22,7 +22,7 @@ A professional Arabic web application for the Egyptian Ministry of Interior (MOI
 ## 📋 Project Structure
 
 ```
-moi-demo/
+mmm-demo/
 ├── src/
 │   ├── components/
 │   │   ├── Login.jsx                      # Login page
@@ -61,7 +61,7 @@ moi-demo/
 
 1. Clone or download the project:
 ```bash
-cd moi-demo
+cd mmm-demo
 ```
 
 2. Install dependencies:
@@ -91,7 +91,7 @@ The production-ready files will be in the `dist/` directory.
 
 ### Login Flow
 1. User enters username/mobile and password
-2. Credentials validated against MOI API
+2. Credentials validated against  API
 3. Upon success, user redirected to dashboard with stored token
 4. Forgot password option available for password recovery
 
@@ -147,7 +147,7 @@ The production-ready files will be in the `dist/` directory.
 
 ## 🔐 API Integration
 
-The application integrates with the Egyptian Ministry of Interior API:
+The application integrates with the  API:
 
 **Base URL**: `https://webapi.moi.gov.eg`
 
@@ -239,7 +239,7 @@ All API errors are:
 
 ## 📄 License
 
-This is a demonstration project for the Egyptian Ministry of Interior.
+This is a demonstration project for the .
 
 ## 👨‍💻 Development
 
@@ -264,4 +264,4 @@ For API-related questions or issues, refer to the [API_DOCUMENTATION.md](docs/AP
 
 ---
 
-**Built with ❤️ for the Egyptian Ministry of Interior**
+**Built with ❤️ for the **

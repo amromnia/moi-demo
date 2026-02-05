@@ -117,10 +117,10 @@ function RegistrationStep1() {
       <div className="auth-card large">
         <div className="auth-header">
           <div className="logo-container">
-            <div className="logo-badge">MOI</div>
+            
           </div>
           <h1>إنشاء حساب جديد</h1>
-          <p className="auth-subtitle">وزارة الداخلية - جمهورية مصر العربية</p>
+          <p className="auth-subtitle"> - </p>
           <div className="steps-indicator">
             <div className="step active">1</div>
             <div className="step-line"></div>
@@ -146,7 +146,7 @@ function RegistrationStep1() {
               name="fullName"
               value={formData.fullName}
               onChange={handleChange}
-              placeholder="أدخل الاسم الكامل"
+              placeholder="أدخل الاسم الرباعي"
               className={fieldErrors.fullName ? 'error' : ''}
               required
             />

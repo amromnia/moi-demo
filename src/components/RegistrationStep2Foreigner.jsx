@@ -125,7 +125,7 @@ function RegistrationStep2Foreigner() {
       <div className="auth-card large">
         <div className="auth-header">
           <div className="logo-container">
-            <div className="logo-badge">MOI</div>
+            
           </div>
           <h1>إنشاء حساب جديد</h1>
           <p className="auth-subtitle">مقيم</p>

@@ -1,4 +1,4 @@
-# MOI API - Post-Registration & Account Management Flows
+#  API - Post-Registration & Account Management Flows
 ## SMS Activation, Profile Management, and Password Recovery
 
 ---
@@ -725,4 +725,4 @@ const response = await authenticatedFetch(
 
 **End of Post-Registration Flows Documentation**
 
-This document covers all post-registration flows including SMS activation, profile retrieval, and password recovery based on analysis of the decompiled MOI Android APK.
+This document covers all post-registration flows including SMS activation, profile retrieval, and password recovery based on analysis of the decompiled  Android APK.

@@ -10,10 +10,10 @@ function RegistrationSuccess() {
       <div className="auth-card">
         <div className="auth-header">
           <div className="logo-container">
-            <div className="logo-badge">MOI</div>
+            
           </div>
           <h1>تم التسجيل بنجاح</h1>
-          <p className="auth-subtitle">وزارة الداخلية - جمهورية مصر العربية</p>
+          <p className="auth-subtitle"> - </p>
         </div>
 
         <div className="success-container">
