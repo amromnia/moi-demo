@@ -1,11 +1,16 @@
 {
+  "functions": {
+    "api/**/*.js": {
+      "runtime": "nodejs18.x"
+    }
+  },
   "rewrites": [
     {
       "source": "/token",
       "destination": "/api/token"
     },
     {
-      "source": "/((?!api|token).*)",
+      "source": "/((?!api|token|assets|_next).*)",
       "destination": "/index.html"
     }
   ]

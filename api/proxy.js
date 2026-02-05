@@ -8,16 +8,20 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Get the path segments after /api/
-    const { path, ...queryParams } = req.query;
-    const apiPath = Array.isArray(path) ? path.join('/') : path;
+    // Get the target path from query
+    const targetPath = req.query.target;
     
-    // Build query string from remaining params
-    const queryString = Object.keys(queryParams).length > 0 
-      ? '?' + new URLSearchParams(queryParams).toString()
+    if (!targetPath) {
+      return res.status(400).json({ error: 'Missing target path' });
+    }
+
+    // Build the full URL with remaining query params
+    const { target, ...otherParams } = req.query;
+    const queryString = Object.keys(otherParams).length > 0 
+      ? '?' + new URLSearchParams(otherParams).toString()
       : '';
     
-    const targetUrl = `https://webapi.moi.gov.eg/api/${apiPath}${queryString}`;
+    const targetUrl = `https://webapi.moi.gov.eg${targetPath}${queryString}`;
     
     console.log('Proxying to:', targetUrl);
     console.log('Method:', req.method);
@@ -25,25 +29,21 @@ export default async function handler(req, res) {
     // Build headers
     const headers = {};
     
-    // Set content type based on the request
     if (req.headers['content-type']) {
       headers['Content-Type'] = req.headers['content-type'];
     } else if (req.method !== 'GET' && req.method !== 'HEAD') {
       headers['Content-Type'] = 'application/json';
     }
     
-    // Forward Authorization header if present
     if (req.headers.authorization) {
       headers['Authorization'] = req.headers.authorization;
     }
 
-    // Build fetch options
     const fetchOptions = {
       method: req.method,
       headers,
     };
 
-    // Add body for non-GET requests
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       if (typeof req.body === 'string') {
         fetchOptions.body = req.body;
@@ -56,17 +56,13 @@ export default async function handler(req, res) {
     const data = await response.text();
     
     console.log('Response status:', response.status);
-    console.log('Response data:', data.substring(0, 500));
     
-    // Set CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     
-    // Forward the response status
     res.status(response.status);
     
-    // Try to parse as JSON, otherwise send as text
     if (data) {
       try {
         const jsonData = JSON.parse(data);

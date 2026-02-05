@@ -1,5 +1,25 @@
-// Always use relative URLs - Vite proxy in dev, Vercel serverless functions in prod
-const BASE_URL = '';
+// In development, use Vite proxy. In production, use Vercel serverless proxy
+const IS_DEV = import.meta.env.DEV;
+
+/**
+ * Build the API URL - in dev uses Vite proxy, in prod uses Vercel serverless function
+ * @param {string} path - The API path (e.g., '/api/MoiProfileApi/GetProfile')
+ * @param {object} params - Query parameters object
+ * @returns {string} The full URL to call
+ */
+function buildApiUrl(path, params = {}) {
+  if (IS_DEV) {
+    // In development, call the path directly (Vite proxy handles it)
+    const queryString = Object.keys(params).length > 0 
+      ? '?' + new URLSearchParams(params).toString() 
+      : '';
+    return `${path}${queryString}`;
+  } else {
+    // In production, use the proxy endpoint
+    const allParams = { target: path, ...params };
+    return `/api/proxy?${new URLSearchParams(allParams).toString()}`;
+  }
+}
 
 /**
  * Login user
@@ -14,7 +34,7 @@ export async function login(username, password) {
   formData.append('grant_type', 'password');
 
   try {
-    const response = await fetch(`${BASE_URL}/token`, {
+    const response = await fetch('/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -112,7 +132,7 @@ export async function login(username, password) {
 export async function getNationalities() {
   try {
     const response = await fetch(
-      `${BASE_URL}/api/MoiMasterDataApi/GetNationalities`,
+      buildApiUrl('/api/MoiMasterDataApi/GetNationalities'),
       { 
         method: 'GET',
         headers: {
@@ -172,7 +192,7 @@ export async function getNationalities() {
 export async function getGovernorates() {
   try {
     const response = await fetch(
-      `${BASE_URL}/api/MoiMasterDataApi/GetGovernorates`,
+      buildApiUrl('/api/MoiMasterDataApi/GetGovernorates'),
       { 
         method: 'GET',
         headers: {
@@ -247,7 +267,7 @@ export async function registerCitizen(userData) {
 
   try {
     const response = await fetch(
-      `${BASE_URL}/api/mobile_memberApi/RegisterCitizen`,
+      buildApiUrl('/api/mobile_memberApi/RegisterCitizen'),
       {
         method: 'POST',
         headers: {
@@ -300,7 +320,7 @@ export async function registerForeigner(userData) {
 
   try {
     const response = await fetch(
-      `${BASE_URL}/api/mobile_memberApi/RegisterForeigner`,
+      buildApiUrl('/api/mobile_memberApi/RegisterForeigner'),
       {
         method: 'POST',
         headers: {
@@ -394,7 +414,7 @@ export async function activateAccountBySMS(memberId, mobile, code) {
 
   try {
     const response = await fetch(
-      `${BASE_URL}/api/mobile_memberApi/ActivateBySMS`,
+      buildApiUrl('/api/mobile_memberApi/ActivateBySMS'),
       {
         method: 'POST',
         headers: {
@@ -451,7 +471,7 @@ export async function getUserProfile(memberId) {
 
   try {
     const response = await fetch(
-      `${BASE_URL}/api/MoiProfileApi/GetProfile?memberId=${memberId}`,
+      buildApiUrl('/api/MoiProfileApi/GetProfile', { memberId }),
       {
         method: 'GET',
         headers: {
@@ -507,7 +527,7 @@ export async function requestPasswordReset(email, cardIdOrPassport) {
 
   try {
     const response = await fetch(
-      `${BASE_URL}/api/mobile_memberApi/RequestForgetPassword`,
+      buildApiUrl('/api/mobile_memberApi/RequestForgetPassword'),
       {
         method: 'POST',
         headers: {
