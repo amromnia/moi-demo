@@ -1,5 +1,5 @@
-// Use proxy in development, direct URL in production
-const BASE_URL = import.meta.env.DEV ? '' : 'https://webapi.moi.gov.eg';
+// Always use relative URLs - Vite proxy in dev, Vercel serverless functions in prod
+const BASE_URL = '';
 
 /**
  * Login user
