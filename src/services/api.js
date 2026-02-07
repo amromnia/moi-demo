@@ -1,24 +1,13 @@
-// In development, use Vite proxy. In production, use Vercel serverless proxy
-const IS_DEV = import.meta.env.DEV;
-
 /**
- * Build the API URL - in dev uses Vite proxy, in prod uses Vercel serverless function
+ * Build the API URL - always uses the Express server proxy
  * @param {string} path - The API path (e.g., '/api/MoiProfileApi/GetProfile')
  * @param {object} params - Query parameters object
  * @returns {string} The full URL to call
  */
 function buildApiUrl(path, params = {}) {
-  if (IS_DEV) {
-    // In development, call the path directly (Vite proxy handles it)
-    const queryString = Object.keys(params).length > 0 
-      ? '?' + new URLSearchParams(params).toString() 
-      : '';
-    return `${path}${queryString}`;
-  } else {
-    // In production, use the proxy endpoint
-    const allParams = { target: path, ...params };
-    return `/api/proxy?${new URLSearchParams(allParams).toString()}`;
-  }
+  // Use the proxy endpoint with target parameter
+  const allParams = { target: path, ...params };
+  return `/api/proxy?${new URLSearchParams(allParams).toString()}`;
 }
 
 /**
