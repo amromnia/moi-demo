@@ -13,7 +13,6 @@ import { isLoggedIn } from './services/api';
 // Protected route wrapper that checks auth on each render
 function ProtectedRoute({ children }) {
   const loggedIn = isLoggedIn();
-  console.log('ProtectedRoute check - isLoggedIn:', loggedIn);
   
   if (!loggedIn) {
     return <Navigate to="/login" replace />;

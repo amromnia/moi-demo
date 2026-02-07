@@ -34,14 +34,11 @@ function Login() {
     setLoading(true);
     
     try {
-      console.log('Attempting login...');
-      const result = await login(formData.username, formData.password);
-      console.log('Login result:', result);
+      const result = await login(formData.email, formData.password, formData.dbType);
       
       if (result.success) {
         // Double-check token was saved
         const token = localStorage.getItem('access_token');
-        console.log('Token after login:', !!token);
         
         if (!token) {
           console.error('Token not found in localStorage after successful login');
@@ -50,7 +47,6 @@ function Login() {
           return;
         }
         
-        console.log('Navigating to dashboard...');
         // Use replace to avoid back button issues and window.location as fallback
         try {
           navigate('/dashboard', { replace: true });

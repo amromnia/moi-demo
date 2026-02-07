@@ -26,6 +26,38 @@ Catch-all route that proxies directly to MOI API:
 /api/MoiProfileApi/GetProfile
 ```
 
+### `/api/traffic-sync` - Traffic service integration
+Server-side endpoint that handles 3-step authentication with traffic.moi.gov.eg service.
+This endpoint synchronizes newly registered users with the traffic service.
+
+**Can be disabled** - See Feature Flags section below.
+
+## Feature Flags
+
+### Traffic Sync Toggle
+
+You can completely enable/disable the traffic sync feature using environment variables:
+
+**Frontend (.env):**
+```bash
+# Set to 'false' to disable traffic sync UI and functionality
+VITE_ENABLE_TRAFFIC_SYNC=false
+```
+
+**Backend (.env):**
+```bash
+# Set to 'false' to disable traffic sync endpoint
+ENABLE_TRAFFIC_SYNC=false
+```
+
+When disabled:
+- ✅ Traffic sync UI is hidden on Dashboard
+- ✅ No automatic sync attempts on first login
+- ✅ Server endpoint returns "disabled" response
+- ✅ No calls to traffic.moi.gov.eg
+
+Default: **Enabled** (both frontend and backend)
+
 ## Development
 
 1. Install dependencies:
@@ -86,7 +118,16 @@ CMD ["npm", "run", "server"]
 ```
 
 ### Environment Variables
-- `MMM_PORT`: Server port (default: 3000)
+
+**Production:**
+- `PORT`: Server port (default: 3000)
+- `ENABLE_TRAFFIC_SYNC`: Enable/disable traffic sync (default: true, set to 'false' to disable)
+
+**Development:**
+- `MMM_PORT`: Dev server port (default: 3001)
+- `VITE_ENABLE_TRAFFIC_SYNC`: Enable/disable traffic sync UI (default: true, set to 'false' to disable)
+
+Copy `.env.example` to `.env` and configure as needed.
 
 ## Benefits over Vercel Functions
 

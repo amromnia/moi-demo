@@ -19,9 +19,6 @@ export default async function handler(req, res) {
     
     const targetUrl = `https://webapi.moi.gov.eg/api/${apiPath}${queryString}`;
     
-    console.log('Proxying to:', targetUrl);
-    console.log('Method:', req.method);
-
     // Build headers
     const headers = {};
     
@@ -54,9 +51,6 @@ export default async function handler(req, res) {
 
     const response = await fetch(targetUrl, fetchOptions);
     const data = await response.text();
-    
-    console.log('Response status:', response.status);
-    console.log('Response data:', data.substring(0, 500));
     
     // Set CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');

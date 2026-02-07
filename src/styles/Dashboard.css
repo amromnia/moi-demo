@@ -408,3 +408,106 @@
     width: 100%;
   }
 }
+
+/* Traffic Sync Status Styles */
+.sync-status {
+  margin: 1.5rem 0;
+  padding: 1.25rem;
+  border-radius: 8px;
+  border: 2px solid #e2e8f0;
+  background: #f8fafc;
+  transition: all 0.3s ease;
+}
+
+.sync-status.sync-syncing {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.sync-status.sync-success {
+  border-color: #10b981;
+  background: #ecfdf5;
+}
+
+.sync-status.sync-error {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+.sync-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.sync-header h4 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.sync-header .spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.sync-header .status-icon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.sync-header .status-icon.success {
+  color: #10b981;
+}
+
+.sync-header .status-icon.error {
+  color: #ef4444;
+}
+
+.sync-message {
+  margin: 0;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.sync-details {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.btn-retry {
+  margin-top: 1rem;
+  padding: 0.6rem 1.5rem;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-retry:hover {
+  background: #dc2626;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.btn-retry:active {
+  transform: translateY(0);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

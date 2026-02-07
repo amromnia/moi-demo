@@ -32,8 +32,6 @@ export async function login(username, password) {
     });
 
     const text = await response.text();
-    console.log('Login response status:', response.status);
-    console.log('Login response text:', text);
 
     if (response.ok) {
       // Check if response is empty
@@ -75,7 +73,6 @@ export async function login(username, password) {
             };
           }
           
-          console.log('Login successful, token stored:', !!storedToken);
           return { success: true, data };
         } catch (storageError) {
           console.error('localStorage error:', storageError);
@@ -359,7 +356,6 @@ export function logout() {
  */
 export function isLoggedIn() {
   const token = localStorage.getItem('access_token');
-  console.log('isLoggedIn check - token exists:', !!token);
   return !!token;
 }
 
@@ -369,10 +365,8 @@ export function isLoggedIn() {
  */
 export function getCurrentUser() {
   const token = localStorage.getItem('access_token');
-  console.log('getCurrentUser - token exists:', !!token);
   
   if (!token) {
-    console.log('getCurrentUser - returning null (no token)');
     return null;
   }
   
@@ -383,7 +377,6 @@ export function getCurrentUser() {
     email: localStorage.getItem('email')
   };
   
-  console.log('getCurrentUser - returning user:', user);
   return user;
 }
 
