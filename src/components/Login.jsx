@@ -34,7 +34,7 @@ function Login() {
     setLoading(true);
     
     try {
-      const result = await login(formData.email, formData.password, formData.dbType);
+      const result = await login(formData.username, formData.password);
       
       if (result.success) {
         // Double-check token was saved

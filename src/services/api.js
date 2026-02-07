@@ -17,6 +17,7 @@ function buildApiUrl(path, params = {}) {
  * @returns {Promise<{success: boolean, data?: object, message?: string}>}
  */
 export async function login(username, password) {
+  console.log('Attempting login with username:', username);
   const formData = new URLSearchParams();
   formData.append('userName', username);
   formData.append('password', password);
