@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { getCurrentUser, logout, isLoggedIn, getUserProfile } from '../services/api';
 import { syncWithTrafficService, needsTrafficSync, markTrafficSynced } from '../utils/trafficSync';
 import '../styles/Dashboard.css';
@@ -9,12 +9,14 @@ const ENABLE_TRAFFIC_SYNC = import.meta.env.VITE_ENABLE_TRAFFIC_SYNC !== 'false'
 
 function Dashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState(null);
   const [trafficSync, setTrafficSync] = useState({
     status: 'idle', // idle, syncing, success, error
     message: ''
   });
   const syncInitiatedRef = useRef(false);
+  const passwordRef = useRef(location.state?.password);
 
   useEffect(() => {
     const loggedIn = isLoggedIn();
@@ -27,6 +29,11 @@ function Dashboard() {
     const currentUser = getCurrentUser();
     setUser(currentUser);
 
+    // Clear password from navigation state for security
+    if (location.state?.password) {
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+
     // Check if traffic sync is enabled and needed (only if not already initiated)
     if (ENABLE_TRAFFIC_SYNC) {
       if (needsTrafficSync() && !syncInitiatedRef.current) {
@@ -38,7 +45,7 @@ function Dashboard() {
     } else {
       setTrafficSync({ status: 'idle', message: '' });
     }
-  }, [navigate]);
+  }, [navigate, location]);
 
   const handleTrafficSync = async (userData) => {
     if (!userData) {
@@ -121,7 +128,23 @@ function Dashboard() {
       const isCitizen = localStorage.getItem('isCitizen') === 'True';
       const nationalityType = isCitizen ? 1 : 0;
 
-      const result = await syncWithTrafficService(token, email, nationalityType, nationalId);
+      // Get password from ref (it was passed via navigation state)
+      const password = passwordRef.current;
+      
+      if (!password) {
+        console.error('Password not available for traffic sync');
+        setTrafficSync({ 
+          status: 'error', 
+          message: 'فشل التحقق: كلمة المرور غير متوفرة',
+          details: 'Password is required for traffic sync'
+        });
+        return;
+      }
+
+      const result = await syncWithTrafficService(token, email, nationalityType, nationalId, password);
+
+      // Clear password from memory after use
+      passwordRef.current = null;
 
       if (result.success) {
         markTrafficSynced();
@@ -140,6 +163,8 @@ function Dashboard() {
       }
     } catch (error) {
       console.error('Traffic sync exception:', error);
+      // Clear password from memory
+      passwordRef.current = null;
       setTrafficSync({ 
         status: 'error', 
         message: 'حدث خطأ غير متوقع' 

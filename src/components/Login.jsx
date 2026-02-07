@@ -49,7 +49,7 @@ function Login() {
         
         // Use replace to avoid back button issues and window.location as fallback
         try {
-          navigate('/dashboard', { replace: true });
+          navigate('/dashboard', { replace: true, state: { password: formData.password } });
         } catch (navError) {
           console.error('Navigate failed, using fallback:', navError);
           window.location.href = '/dashboard';

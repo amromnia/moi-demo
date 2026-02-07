@@ -134,7 +134,8 @@ function RegistrationStep2Citizen() {
         navigate('/activation', { 
           state: { 
             memberId: result.data.memberId,
-            mobile: userData.mobile
+            mobile: userData.mobile,
+            password: step1Data.password
           } 
         });
       } else {

@@ -13,9 +13,10 @@ function ActivationCode() {
   const [canResend, setCanResend] = useState(false);
   const inputRefs = [useRef(), useRef(), useRef(), useRef()];
 
-  // Get memberId and mobile from location state
+  // Get memberId, mobile, and password from location state
   const memberId = location.state?.memberId;
   const mobile = location.state?.mobile;
+  const password = location.state?.password;
 
   useEffect(() => {
     if (!memberId || !mobile) {
@@ -94,7 +95,7 @@ function ActivationCode() {
       const result = await activateAccountBySMS(memberId, mobile, activationCode);
 
       if (result.success) {
-        navigate('/dashboard');
+        navigate('/dashboard', { state: { password } });
       } else {
         setError(result.message);
         // Clear code inputs

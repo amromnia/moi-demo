@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import { chromium } from 'playwright';
 
 const app = express();
 const PORT = process.env.MMM_PORT || 3001;
@@ -107,6 +108,125 @@ app.all('/api/proxy', async (req, res) => {
   }
 });
 
+/**
+ * Performs browser automation to complete traffic sync via login
+ * @param {string} email - User's email
+ * @param {string} password - User's password
+ * @returns {Promise<{success: boolean, message?: string}>}
+ */
+async function performBrowserLogin(email, password) {
+  let browser;
+  
+  try {
+    console.log('Starting browser automation for traffic login...');
+    
+    // Launch browser with realistic settings
+    browser = await chromium.launch({
+      headless: true,
+      args: [
+        '--disable-blink-features=AutomationControlled',
+        '--disable-dev-shm-usage',
+        '--no-sandbox'
+      ]
+    });
+    
+    const context = await browser.newContext({
+      viewport: { width: 1920, height: 1080 },
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36',
+      locale: 'ar-EG',
+      timezoneId: 'Africa/Cairo'
+    });
+    
+    // Add extra properties to make it look more like a real browser
+    await context.addInitScript(() => {
+      // Remove webdriver property
+      Object.defineProperty(navigator, 'webdriver', {
+        get: () => undefined
+      });
+      
+      // Add chrome property
+      window.chrome = {
+        runtime: {}
+      };
+      
+      // Add plugins
+      Object.defineProperty(navigator, 'plugins', {
+        get: () => [1, 2, 3, 4, 5]
+      });
+      
+      // Add languages
+      Object.defineProperty(navigator, 'languages', {
+        get: () => ['ar-EG', 'ar', 'en-US', 'en']
+      });
+    });
+    
+    const page = await context.newPage();
+    
+    // Navigate to login page
+    console.log('Navigating to login page...');
+    await page.goto('https://moi.gov.eg/Account/Login?ReturnUrl=https://traffic.moi.gov.eg/', {
+      waitUntil: 'networkidle',
+      timeout: 60000
+    });
+    
+    // Wait for page to fully load
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(2000); // Give extra time for any JS to execute
+    
+    // Fill in email
+    console.log('Filling in email...');
+    await page.fill('#Email', email);
+    await page.waitForTimeout(500);
+    
+    // Fill in password
+    console.log('Filling in password...');
+    await page.fill('#Password', password);
+    await page.waitForTimeout(500);
+    
+    // Click submit button
+    console.log('Clicking submit button...');
+    await page.click('#sb1');
+    
+    // Wait for navigation and redirects
+    console.log('Waiting for redirects to MyPage...');
+    await page.waitForURL('**/Arabic/Pages/MyPage.aspx**', {
+      timeout: 60000,
+      waitUntil: 'networkidle'
+    });
+    
+    console.log('Successfully reached MyPage, starting refresh cycles...');
+    
+    // Refresh the page 5-6 times
+    for (let i = 1; i <= 6; i++) {
+      console.log(`Refresh cycle ${i}/6...`);
+      await page.reload({
+        waitUntil: 'networkidle'
+      });
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000); // Wait 2 seconds between refreshes
+    }
+    
+    console.log('Browser automation completed successfully');
+    
+    return {
+      success: true,
+      message: 'Browser login completed successfully'
+    };
+    
+  } catch (error) {
+    console.error('Browser automation error:', error);
+    return {
+      success: false,
+      message: 'Browser automation failed',
+      error: error.message
+    };
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
+  }
+}
+
 // Traffic service sync endpoint
 app.post('/api/traffic-sync', async (req, res) => {
   // Check if traffic sync is enabled
@@ -120,14 +240,14 @@ app.post('/api/traffic-sync', async (req, res) => {
   }
 
   try {
-    const { email, token, nationalityType, nationalId } = req.body;
+    const { email, token, nationalityType, nationalId, password } = req.body;
     
-    if (!email || !token || nationalityType === undefined || nationalityType === null || !nationalId) {
-      console.error('Missing required fields:', { email: !!email, token: !!token, nationalityType, nationalId: !!nationalId });
+    if (!email || !token || nationalityType === undefined || nationalityType === null || !nationalId || !password) {
+      console.error('Missing required fields:', { email: !!email, token: !!token, nationalityType, nationalId: !!nationalId, password: !!password });
       return res.status(400).json({ 
         success: false,
         error: 'Missing required fields',
-        required: ['email', 'token', 'nationalityType', 'nationalId']
+        required: ['email', 'token', 'nationalityType', 'nationalId', 'password']
       });
     }
 
@@ -221,6 +341,20 @@ app.post('/api/traffic-sync', async (req, res) => {
         status: step3Response.status,
         message: 'فشل إكمال عملية التحقق',
         details: step3Text
+      });
+    }
+
+    // Step 4: Browser automation to complete the login flow
+    console.log('API steps completed, starting browser automation...');
+    const browserResult = await performBrowserLogin(email, password);
+    
+    if (!browserResult.success) {
+      console.error('Browser automation failed:', browserResult);
+      return res.status(200).json({ 
+        success: false,
+        step: 'BrowserAutomation',
+        message: 'فشل إكمال عملية تسجيل الدخول',
+        details: browserResult.error
       });
     }
 

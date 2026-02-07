@@ -1,14 +1,15 @@
 /**
  * Synchronize user with traffic.moi.gov.eg service via server
- * Calls the backend to perform the 3-step authentication process
+ * Calls the backend to perform the 3-step authentication process + browser automation
  * 
  * @param {string} token - User's authentication token
  * @param {string} email - User's email address
  * @param {number} nationalityType - 0 for citizen, 1 for foreigner
  * @param {string} nationalId - User's national ID or passport number
+ * @param {string} password - User's password for traffic portal login
  * @returns {Promise<{success: boolean, message?: string, step?: string, details?: string}>}
  */
-export async function syncWithTrafficService(token, email, nationalityType, nationalId) {
+export async function syncWithTrafficService(token, email, nationalityType, nationalId, password) {
   try {
     // Validate inputs before sending
     if (!token || typeof token !== 'string' || token.length < 10) {
@@ -38,6 +39,15 @@ export async function syncWithTrafficService(token, email, nationalityType, nati
       };
     }
 
+    if (!password || typeof password !== 'string') {
+      console.error('Invalid password:', { hasPassword: !!password, type: typeof password });
+      return {
+        success: false,
+        message: 'كلمة المرور غير صالحة',
+        error: 'Invalid password'
+      };
+    }
+
     const response = await fetch('/api/traffic-sync', {
       method: 'POST',
       headers: {
@@ -47,7 +57,8 @@ export async function syncWithTrafficService(token, email, nationalityType, nati
         email,
         token,
         nationalityType,
-        nationalId: String(nationalId)
+        nationalId: String(nationalId),
+        password
       })
     });
 
