@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { requestPasswordReset } from '../services/api';
 import { validateEmail } from '../utils/validation';
+import logoImage from '../assets/logo.png';
 import '../styles/Auth.css';
 
 function ForgotPassword() {
@@ -76,7 +77,7 @@ function ForgotPassword() {
         <div className="auth-card">
           <div className="auth-header">
             <div className="logo-container">
-              
+              <img src={logoImage} alt="Logo" className="logo-image" />
             </div>
             <h1>تم إرسال الرابط</h1>
             <p className="auth-subtitle"> - </p>
@@ -118,7 +119,7 @@ function ForgotPassword() {
       <div className="auth-card">
         <div className="auth-header">
           <div className="logo-container">
-            
+            <img src={logoImage} alt="Logo" className="logo-image" />
           </div>
           <h1>نسيت كلمة المرور</h1>
           <p className="auth-subtitle"> - </p>

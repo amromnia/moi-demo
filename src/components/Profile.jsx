@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { getCurrentUser, getUserProfile, isLoggedIn, logout } from '../services/api';
+import logoImage from '../assets/logo.png';
 import '../styles/Dashboard.css';
 
 function Profile() {
@@ -63,7 +64,7 @@ function Profile() {
     return (
       <div className="dashboard-container">
         <div className="dashboard-header">
-          
+          <img src={logoImage} alt="Logo" className="logo-image" />
           <div className="header-content">
             <h1></h1>
             <p></p>
@@ -91,7 +92,7 @@ function Profile() {
   return (
     <div className="dashboard-container">
       <div className="dashboard-header">
-        
+        <img src={logoImage} alt="Logo" className="logo-image" />
         <div className="header-content">
           <h1></h1>
           <p></p>

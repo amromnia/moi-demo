@@ -1,4 +1,5 @@
 import { useLocation, Link } from 'react-router-dom';
+import logoImage from '../assets/logo.png';
 import '../styles/Auth.css';
 
 function RegistrationSuccess() {
@@ -10,7 +11,7 @@ function RegistrationSuccess() {
       <div className="auth-card">
         <div className="auth-header">
           <div className="logo-container">
-            
+            <img src={logoImage} alt="Logo" className="logo-image" />
           </div>
           <h1>تم التسجيل بنجاح</h1>
           <p className="auth-subtitle"> - </p>

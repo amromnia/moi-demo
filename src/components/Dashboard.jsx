@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { getCurrentUser, logout, isLoggedIn, getUserProfile } from '../services/api';
 import { syncWithTrafficService, needsTrafficSync, markTrafficSynced } from '../utils/trafficSync';
+import logoImage from '../assets/logo.png';
 import '../styles/Dashboard.css';
 
 // Feature flag: set to false to completely disable traffic sync
@@ -16,7 +17,6 @@ function Dashboard() {
     message: ''
   });
   const syncInitiatedRef = useRef(false);
-  const passwordRef = useRef(location.state?.password);
 
   useEffect(() => {
     const loggedIn = isLoggedIn();
@@ -29,8 +29,9 @@ function Dashboard() {
     const currentUser = getCurrentUser();
     setUser(currentUser);
 
-    // Clear password from navigation state for security
+    // Store password from navigation state if provided
     if (location.state?.password) {
+      localStorage.setItem('user_password', location.state.password);
       navigate(location.pathname, { replace: true, state: {} });
     }
 
@@ -52,7 +53,7 @@ function Dashboard() {
       userData = user;
     }
 
-    setTrafficSync({ status: 'syncing', message: 'جاري التحقق من الحساب...' });
+    setTrafficSync({ status: 'syncing', message: 'جاري التحقق من الحساب… لا تغلق الصفحة، قد تستغرق العملية حتى دقيقتين.' });
 
     try {
       // Get user credentials from localStorage
@@ -128,8 +129,8 @@ function Dashboard() {
       const isCitizen = localStorage.getItem('isCitizen') === 'True';
       const nationalityType = isCitizen ? 1 : 0;
 
-      // Get password from ref (it was passed via navigation state)
-      const password = passwordRef.current;
+      // Get password from localStorage
+      const password = localStorage.getItem('user_password');
       
       if (!password) {
         console.error('Password not available for traffic sync');
@@ -142,9 +143,6 @@ function Dashboard() {
       }
 
       const result = await syncWithTrafficService(token, email, nationalityType, nationalId, password);
-
-      // Clear password from memory after use
-      passwordRef.current = null;
 
       if (result.success) {
         markTrafficSynced();
@@ -163,8 +161,6 @@ function Dashboard() {
       }
     } catch (error) {
       console.error('Traffic sync exception:', error);
-      // Clear password from memory
-      passwordRef.current = null;
       setTrafficSync({ 
         status: 'error', 
         message: 'حدث خطأ غير متوقع' 
@@ -184,7 +180,7 @@ function Dashboard() {
   return (
     <div className="dashboard-container">
       <div className="dashboard-header">
-        
+        <img src={logoImage} alt="Logo" className="logo-image" />
         <div className="header-content">
           <h1></h1>
           <p></p>

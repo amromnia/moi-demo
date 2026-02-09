@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { login } from '../services/api';
+import logoImage from '../assets/logo.png';
 import '../styles/Auth.css';
 
 function Login() {
@@ -70,10 +71,9 @@ function Login() {
       <div className="auth-card">
         <div className="auth-header">
           <div className="logo-container">
-            
+            <img src={logoImage} alt="Logo" className="logo-image" />
           </div>
           <h1>تسجيل الدخول</h1>
-          <p className="auth-subtitle"> - </p>
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">

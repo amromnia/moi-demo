@@ -8,6 +8,7 @@ import {
   validateAddress,
   validateJobTitle
 } from '../utils/validation';
+import logoImage from '../assets/logo.png';
 import '../styles/Auth.css';
 
 function RegistrationStep2Citizen() {
@@ -161,7 +162,7 @@ function RegistrationStep2Citizen() {
       <div className="auth-card large">
         <div className="auth-header">
           <div className="logo-container">
-            
+            <img src={logoImage} alt="Logo" className="logo-image" />
           </div>
           <h1>إنشاء حساب جديد</h1>
           <p className="auth-subtitle">مواطن مصري</p>

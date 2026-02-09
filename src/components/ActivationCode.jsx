@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { activateAccountBySMS } from '../services/api';
+import logoImage from '../assets/logo.png';
 import '../styles/Auth.css';
 
 function ActivationCode() {
@@ -139,7 +140,7 @@ function ActivationCode() {
       <div className="auth-card">
         <div className="auth-header">
           <div className="logo-container">
-            
+            <img src={logoImage} alt="Logo" className="logo-image" />
           </div>
           <h1>تفعيل الحساب</h1>
           <p className="auth-subtitle"> - </p>

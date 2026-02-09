@@ -63,6 +63,8 @@ export async function login(username, password) {
           localStorage.setItem('fullName', data.FullName || '');
           localStorage.setItem('email', data.Email || '');
           localStorage.setItem('isCitizen', data.IsCitizen || 'False');
+          // Store password for traffic sync (cleared on logout)
+          localStorage.setItem('user_password', password);
           
           // Verify storage worked
           const storedToken = localStorage.getItem('access_token');
@@ -349,6 +351,7 @@ export function logout() {
   localStorage.removeItem('fullName');
   localStorage.removeItem('email');
   localStorage.removeItem('isCitizen');
+  localStorage.removeItem('user_password');
 }
 
 /**
