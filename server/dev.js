@@ -166,7 +166,7 @@ async function performBrowserLogin(email, password) {
     console.log('Navigating to login page...');
     await page.goto('https://moi.gov.eg/Account/Login?ReturnUrl=https://traffic.moi.gov.eg/', {
       waitUntil: 'networkidle',
-      timeout: 60000
+      timeout: 15000
     });
     
     // Wait for page to fully load
@@ -190,7 +190,7 @@ async function performBrowserLogin(email, password) {
     // Wait for navigation and redirects
     console.log('Waiting for redirects to MyPage...');
     await page.waitForURL('**/Arabic/Pages/MyPage.aspx**', {
-      timeout: 60000,
+      timeout: 15000,
       waitUntil: 'networkidle'
     });
     
