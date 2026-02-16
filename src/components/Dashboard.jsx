@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { getCurrentUser, logout, isLoggedIn, getUserProfile } from '../services/api';
+import { getCurrentUser, logout, isLoggedIn } from '../services/api';
 import { syncWithTrafficService, needsTrafficSync, markTrafficSynced } from '../utils/trafficSync';
 import logoImage from '../assets/logo.png';
 import '../styles/Dashboard.css';
@@ -56,93 +56,29 @@ function Dashboard() {
     setTrafficSync({ status: 'syncing', message: 'جاري التحقق من الحساب… لا تغلق الصفحة، قد تستغرق العملية حتى دقيقتين.' });
 
     try {
-      // Get user credentials from localStorage
-      const token = localStorage.getItem('access_token');
-      const email = localStorage.getItem('email');
       const memberId = userData.memberId;
+      const accessToken = localStorage.getItem('access_token');
 
-      // Validate token before proceeding
-      if (!token || token.length < 10) {
-        console.error('Invalid or missing token:', { hasToken: !!token, length: token?.length });
+      if (!memberId) {
+        console.error('Member ID not found');
         setTrafficSync({ 
           status: 'error', 
-          message: 'رمز المصادقة غير صالح أو منتهي الصلاحية' 
+          message: 'معرف العضو غير موجود' 
         });
         return;
       }
 
-      if (!email) {
-        console.error('Email not found in localStorage');
+      if (!accessToken) {
+        console.error('Access token not found');
         setTrafficSync({ 
           status: 'error', 
-          message: 'البريد الإلكتروني غير موجود' 
+          message: 'رمز المصادقة غير موجود. يرجى تسجيل الدخول مرة أخرى' 
         });
         return;
       }
 
-      // Retry logic for getting profile with nationalId
-      let profile = null;
-      let nationalId = null;
-      const maxRetries = 2;
-      
-      for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        if (attempt > 0) {
-          // Wait a bit before retrying
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-
-        const profileResult = await getUserProfile(memberId);
-
-        if (!profileResult.success) {
-          console.error(`Failed to get user profile (attempt ${attempt + 1}):`, profileResult);
-          if (attempt === maxRetries) {
-            setTrafficSync({ 
-              status: 'error', 
-              message: 'فشل الحصول على بيانات المستخدم' 
-            });
-            return;
-          }
-          continue;
-        }
-
-        profile = profileResult.data;
-
-        // Check for nationalId
-        nationalId = profile.cardId || profile.NationalId || profile.PassportNumber;
-        
-        if (nationalId) {
-          break;
-        } else {
-          console.warn(`No nationalId found on attempt ${attempt + 1}`);
-          if (attempt === maxRetries) {
-            console.error('No cardId, NationalId or PassportNumber found after all retries');
-            setTrafficSync({ 
-              status: 'error', 
-              message: 'لا يوجد رقم هوية في بيانات المستخدم' 
-            });
-            return;
-          }
-        }
-      }
-
-      // Determine nationalityType: 0 for citizen (isCitizen=True), 1 for foreigner
-      const isCitizen = localStorage.getItem('isCitizen') === 'True';
-      const nationalityType = isCitizen ? 1 : 0;
-
-      // Get password from localStorage
-      const password = localStorage.getItem('user_password');
-      
-      if (!password) {
-        console.error('Password not available for traffic sync');
-        setTrafficSync({ 
-          status: 'error', 
-          message: 'فشل التحقق: كلمة المرور غير متوفرة',
-          details: 'Password is required for traffic sync'
-        });
-        return;
-      }
-
-      const result = await syncWithTrafficService(token, email, nationalityType, nationalId, password);
+      // Call the traffic sync service with authentication
+      const result = await syncWithTrafficService(memberId, accessToken);
 
       if (result.success) {
         markTrafficSynced();
@@ -151,6 +87,13 @@ function Dashboard() {
           message: 'تم التحقق من حسابك بنجاح' 
         });
       } else {
+        // Check if session expired
+        if (result.sessionExpired) {
+          logout();
+          navigate('/login');
+          return;
+        }
+        
         console.error('Traffic sync failed:', result);
         setTrafficSync({ 
           status: 'error', 

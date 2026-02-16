@@ -1,127 +1,24 @@
-import express from 'express';
-import cors from 'cors';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import dotenv from 'dotenv';
+/**
+ * Traffic Sync API Route
+ * 
+ * This endpoint syncs user data with the external kiosk registration service.
+ * Flow:
+ * 1. Get user profile data from MOI API
+ * 2. Authenticate with kiosk service using credentials
+ * 3. Register/update user in kiosk service
+ * 
+ * Environment Variables Required:
+ * - TRAFFIC_SYNC_BASE_URL: Base URL for the kiosk service
+ * - TRAFFIC_SYNC_USERNAME: Username for kiosk service authentication
+ * - TRAFFIC_SYNC_PASSWORD: Password for kiosk service authentication
+ */
 
-// Load environment variables from .env file
-dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const app = express();
-const PORT = process.env.MMM_PORT || 3000;
-const MOI_API_BASE = 'https://webapi.moi.gov.eg';
-// Feature flag: set to 'false' to completely disable traffic sync
-const ENABLE_TRAFFIC_SYNC = process.env.ENABLE_TRAFFIC_SYNC !== 'false';
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.text());
-
-// Serve static files from dist folder (Vite build output)
-app.use(express.static(join(__dirname, '../dist')));
-
-// Token endpoint - proxy to MOI token endpoint
-app.all('/token', async (req, res) => {
-  try {
-    const response = await fetch(`${MOI_API_BASE}/token`, {
-      method: req.method,
-      headers: {
-        'Content-Type': req.headers['content-type'] || 'application/x-www-form-urlencoded',
-      },
-      body: req.method !== 'GET' ? (typeof req.body === 'string' ? req.body : new URLSearchParams(req.body).toString()) : undefined,
-    });
-
-    const data = await response.text();
-    
-    res.status(response.status);
-    
-    try {
-      const jsonData = JSON.parse(data);
-      res.json(jsonData);
-    } catch {
-      res.send(data);
-    }
-  } catch (error) {
-    console.error('Token endpoint error:', error);
-    res.status(500).json({ error: 'Token endpoint error', message: error.message });
-  }
-});
-
-// Proxy endpoint - flexible proxy with target query param
-app.all('/api/proxy', async (req, res) => {
-  try {
-    const targetPath = req.query.target;
-    
-    if (!targetPath) {
-      return res.status(400).json({ error: 'Missing target path' });
-    }
-
-    const { target, ...otherParams } = req.query;
-    const queryString = Object.keys(otherParams).length > 0 
-      ? '?' + new URLSearchParams(otherParams).toString()
-      : '';
-    
-    const targetUrl = `${MOI_API_BASE}${targetPath}${queryString}`;
-    
-    const headers = {};
-    
-    if (req.headers['content-type']) {
-      headers['Content-Type'] = req.headers['content-type'];
-    } else if (req.method !== 'GET' && req.method !== 'HEAD') {
-      headers['Content-Type'] = 'application/json';
-    }
-    
-    if (req.headers.authorization) {
-      headers['Authorization'] = req.headers.authorization;
-    }
-
-    const fetchOptions = {
-      method: req.method,
-      headers,
-    };
-
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
-      if (typeof req.body === 'string') {
-        fetchOptions.body = req.body;
-      } else if (req.body && Object.keys(req.body).length > 0) {
-        fetchOptions.body = JSON.stringify(req.body);
-      }
-    }
-
-    const response = await fetch(targetUrl, fetchOptions);
-    const data = await response.text();
-    
-    res.status(response.status);
-    
-    if (data) {
-      try {
-        const jsonData = JSON.parse(data);
-        res.json(jsonData);
-      } catch {
-        res.send(data);
-      }
-    } else {
-      res.end();
-    }
-  } catch (error) {
-    console.error('Proxy error:', error);
-    res.status(500).json({ error: 'Proxy error', message: error.message });
-  }
-});
-
-// Traffic service sync endpoint - using kiosk registration API
-app.post('/api/traffic-sync', async (req, res) => {
-  // Check if traffic sync is enabled
-  if (!ENABLE_TRAFFIC_SYNC) {
-    console.log('Traffic sync is disabled via ENABLE_TRAFFIC_SYNC flag');
-    return res.status(200).json({ 
-      success: false,
-      message: 'خدمة المزامنة مع المرور معطلة حالياً',
-      disabled: true
+export default async function handler(req, res) {
+  // Only allow POST requests
+  if (req.method !== 'POST') {
+    return res.status(405).json({ 
+      success: false, 
+      message: 'Method not allowed' 
     });
   }
 
@@ -166,7 +63,7 @@ app.post('/api/traffic-sync', async (req, res) => {
     // Step 1: Get user profile data from MOI API
     console.log('Step 1: Fetching user profile from MOI API...');
     const profileResponse = await fetch(
-      `${MOI_API_BASE}/api/MoiProfileApi/GetProfile?memberId=${memberId}`,
+      `https://webapi.moi.gov.eg/api/MoiProfileApi/GetProfile?memberId=${memberId}`,
       {
         method: 'GET',
         headers: {
@@ -308,7 +205,7 @@ app.post('/api/traffic-sync', async (req, res) => {
       body: JSON.stringify({
         fullName: fullName,
         mobileNumber: mobileNumber,
-        nationalId: `${nationalId}`, // Ensure it's a string
+        nationalId: nationalId,
         email: email || undefined // Only include email if it exists
       })
     });
@@ -374,71 +271,4 @@ app.post('/api/traffic-sync', async (req, res) => {
       error: error.message
     });
   }
-});
-
-// Catch-all for /api/* routes - proxy directly to MOI API
-app.all('/api/*', async (req, res) => {
-  try {
-    const apiPath = req.path.replace('/api/', '');
-    
-    const queryString = Object.keys(req.query).length > 0 
-      ? '?' + new URLSearchParams(req.query).toString()
-      : '';
-    
-    const targetUrl = `${MOI_API_BASE}/api/${apiPath}${queryString}`;
-    
-    const headers = {};
-    
-    if (req.headers['content-type']) {
-      headers['Content-Type'] = req.headers['content-type'];
-    } else if (req.method !== 'GET' && req.method !== 'HEAD') {
-      headers['Content-Type'] = 'application/json';
-    }
-    
-    if (req.headers.authorization) {
-      headers['Authorization'] = req.headers.authorization;
-    }
-
-    const fetchOptions = {
-      method: req.method,
-      headers,
-    };
-
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
-      if (typeof req.body === 'string') {
-        fetchOptions.body = req.body;
-      } else if (req.body && Object.keys(req.body).length > 0) {
-        fetchOptions.body = JSON.stringify(req.body);
-      }
-    }
-
-    const response = await fetch(targetUrl, fetchOptions);
-    const data = await response.text();
-    
-    res.status(response.status);
-    
-    if (data) {
-      try {
-        const jsonData = JSON.parse(data);
-        res.json(jsonData);
-      } catch {
-        res.send(data);
-      }
-    } else {
-      res.end();
-    }
-  } catch (error) {
-    console.error('API proxy error:', error);
-    res.status(500).json({ error: 'API proxy error', message: error.message });
-  }
-});
-
-// Serve index.html for all other routes (SPA fallback)
-app.get('*', (req, res) => {
-  res.sendFile(join(__dirname, '../dist/index.html'));
-});
-
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`Traffic sync: ${ENABLE_TRAFFIC_SYNC ? 'ENABLED' : 'DISABLED'}`);
-});
+}

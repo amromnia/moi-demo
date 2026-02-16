@@ -1,50 +1,33 @@
 /**
- * Synchronize user with traffic.moi.gov.eg service via server
- * Calls the backend to perform the 3-step authentication process + browser automation
+ * Synchronize user with the kiosk registration service
+ * Calls the backend API which:
+ * 1. Fetches user profile from MOI API
+ * 2. Authenticates with kiosk service
+ * 3. Registers/updates user in kiosk service
  * 
- * @param {string} token - User's authentication token
- * @param {string} email - User's email address
- * @param {number} nationalityType - 0 for citizen, 1 for foreigner
- * @param {string} nationalId - User's national ID or passport number
- * @param {string} password - User's password for traffic portal login
+ * @param {string} memberId - User's member ID
+ * @param {string} accessToken - User's access token for MOI API authentication
  * @returns {Promise<{success: boolean, message?: string, step?: string, details?: string}>}
  */
-export async function syncWithTrafficService(token, email, nationalityType, nationalId, password) {
+export async function syncWithTrafficService(memberId, accessToken) {
   try {
-    // Validate inputs before sending
-    if (!token || typeof token !== 'string' || token.length < 10) {
-      console.error('Invalid token:', { hasToken: !!token, type: typeof token, length: token?.length });
+    // Validate memberId
+    if (!memberId || typeof memberId !== 'string') {
+      console.error('Invalid memberId:', { hasMemberId: !!memberId, type: typeof memberId });
+      return {
+        success: false,
+        message: 'معرف العضو غير صالح',
+        error: 'Invalid memberId'
+      };
+    }
+
+    // Validate accessToken
+    if (!accessToken || typeof accessToken !== 'string') {
+      console.error('Invalid accessToken:', { hasAccessToken: !!accessToken, type: typeof accessToken });
       return {
         success: false,
         message: 'رمز المصادقة غير صالح',
-        error: 'Invalid token'
-      };
-    }
-
-    if (!email || typeof email !== 'string') {
-      console.error('Invalid email:', { hasEmail: !!email, type: typeof email });
-      return {
-        success: false,
-        message: 'البريد الإلكتروني غير صالح',
-        error: 'Invalid email'
-      };
-    }
-
-    if (!nationalId || typeof nationalId !== 'string' && typeof nationalId !== 'number') {
-      console.error('Invalid nationalId:', { hasNationalId: !!nationalId, type: typeof nationalId });
-      return {
-        success: false,
-        message: 'رقم الهوية غير صالح',
-        error: 'Invalid nationalId'
-      };
-    }
-
-    if (!password || typeof password !== 'string') {
-      console.error('Invalid password:', { hasPassword: !!password, type: typeof password });
-      return {
-        success: false,
-        message: 'كلمة المرور غير صالحة',
-        error: 'Invalid password'
+        error: 'Invalid accessToken'
       };
     }
 
@@ -54,11 +37,8 @@ export async function syncWithTrafficService(token, email, nationalityType, nati
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        email,
-        token,
-        nationalityType,
-        nationalId: String(nationalId),
-        password
+        memberId: memberId,
+        accessToken: accessToken
       })
     });
 
@@ -70,7 +50,9 @@ export async function syncWithTrafficService(token, email, nationalityType, nati
         success: false,
         message: result.message || 'فشلت عملية المزامنة',
         step: result.step,
-        details: result.details
+        details: result.details,
+        error: result.error,
+        sessionExpired: result.sessionExpired || false
       };
     }
 
