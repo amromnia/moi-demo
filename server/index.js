@@ -20,6 +20,92 @@ const MOI_API_BASE = 'https://webapi.moi.gov.eg';
 // Feature flag: set to 'false' to completely disable traffic sync
 const ENABLE_TRAFFIC_SYNC = process.env.ENABLE_TRAFFIC_SYNC !== 'false';
 
+// Retry configuration
+const MAX_RETRIES = 5;
+const RETRY_DELAY = 1000; // 1 second base delay
+
+/**
+ * Retry wrapper for fetch requests with exponential backoff
+ * Retries on transient errors (network issues, 500+ errors, empty responses, JSON parse errors)
+ * Does NOT retry on user-fixable errors (400-499)
+ */
+async function fetchWithRetry(url, options = {}, retryCount = 0) {
+  try {
+    const response = await fetch(url, options);
+    
+    // Check if we should retry based on status code
+    // Retry on 500+ (server errors) but not on 400-499 (client errors)
+    if (response.status >= 500 && retryCount < MAX_RETRIES) {
+      console.log(`Server error ${response.status}, retrying... (${retryCount + 1}/${MAX_RETRIES})`);
+      await sleep(RETRY_DELAY * Math.pow(2, retryCount)); // Exponential backoff
+      return fetchWithRetry(url, options, retryCount + 1);
+    }
+    
+    // Try to read the response
+    const text = await response.text();
+    
+    // Check for empty response (transient error)
+    if (!text || text.trim() === '') {
+      if (retryCount < MAX_RETRIES) {
+        console.log(`Empty response received, retrying... (${retryCount + 1}/${MAX_RETRIES})`);
+        await sleep(RETRY_DELAY * Math.pow(2, retryCount));
+        return fetchWithRetry(url, options, retryCount + 1);
+      }
+      // Return a response-like object for empty response
+      return {
+        ok: false,
+        status: response.status,
+        text: async () => '',
+        json: async () => { throw new Error('Empty response from server'); }
+      };
+    }
+    
+    // Try to parse as JSON if it looks like JSON
+    let jsonData = null;
+    if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
+      try {
+        jsonData = JSON.parse(text);
+      } catch (jsonError) {
+        // JSON parse error - this is a transient error, retry
+        if (retryCount < MAX_RETRIES) {
+          console.log(`JSON parse error, retrying... (${retryCount + 1}/${MAX_RETRIES})`);
+          await sleep(RETRY_DELAY * Math.pow(2, retryCount));
+          return fetchWithRetry(url, options, retryCount + 1);
+        }
+        // Max retries reached, throw the error
+        throw new Error('Invalid JSON response from server after multiple retries');
+      }
+    }
+    
+    // Return a response-like object with both text and json methods
+    return {
+      ok: response.ok,
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+      text: async () => text,
+      json: async () => jsonData || JSON.parse(text)
+    };
+    
+  } catch (error) {
+    // Network errors, connection issues - retry these
+    if (retryCount < MAX_RETRIES) {
+      console.log(`Network error: ${error.message}, retrying... (${retryCount + 1}/${MAX_RETRIES})`);
+      await sleep(RETRY_DELAY * Math.pow(2, retryCount));
+      return fetchWithRetry(url, options, retryCount + 1);
+    }
+    // Max retries reached, throw the error
+    throw error;
+  }
+}
+
+/**
+ * Sleep utility for retry delays
+ */
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // Environment-specific CORS configuration
 if (isDevelopment) {
   // Development: Allow only Vite dev server
@@ -45,7 +131,7 @@ if (!isDevelopment) {
 // Token endpoint - proxy to MOI token endpoint
 app.all('/token', async (req, res) => {
   try {
-    const response = await fetch(`${MOI_API_BASE}/token`, {
+    const response = await fetchWithRetry(`${MOI_API_BASE}/token`, {
       method: req.method,
       headers: {
         'Content-Type': req.headers['content-type'] || 'application/x-www-form-urlencoded',
@@ -110,7 +196,7 @@ app.all('/api/proxy', async (req, res) => {
       }
     }
 
-    const response = await fetch(targetUrl, fetchOptions);
+    const response = await fetchWithRetry(targetUrl, fetchOptions);
     const data = await response.text();
     
     res.status(response.status);
@@ -183,7 +269,7 @@ app.post('/api/traffic-sync', async (req, res) => {
 
     // Step 1: Get user profile data from MOI API
     console.log('Step 1: Fetching user profile from MOI API...');
-    const profileResponse = await fetch(
+    const profileResponse = await fetchWithRetry(
       `${MOI_API_BASE}/api/MoiProfileApi/GetProfile?memberId=${memberId}`,
       {
         method: 'GET',
@@ -279,7 +365,7 @@ app.post('/api/traffic-sync', async (req, res) => {
 
     // Step 2: Authenticate with kiosk service
     console.log('Step 2: Authenticating with kiosk service...');
-    const authResponse = await fetch(`${baseUrl}/api/Auth/token`, {
+    const authResponse = await fetchWithRetry(`${baseUrl}/api/Auth/token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -317,7 +403,7 @@ app.post('/api/traffic-sync', async (req, res) => {
 
     // Step 3: Register/update user in kiosk service
     console.log('Step 3: Registering user with kiosk service...');
-    const registerResponse = await fetch(`${baseUrl}/api/User/register`, {
+    const registerResponse = await fetchWithRetry(`${baseUrl}/api/User/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -430,7 +516,7 @@ app.all('/api/*', async (req, res) => {
       }
     }
 
-    const response = await fetch(targetUrl, fetchOptions);
+    const response = await fetchWithRetry(targetUrl, fetchOptions);
     const data = await response.text();
     
     res.status(response.status);
