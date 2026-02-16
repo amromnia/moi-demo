@@ -10,19 +10,37 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Detect environment: development or production
+const isDevelopment = process.env.NODE_ENV === 'development';
+
 const app = express();
-const PORT = process.env.MMM_PORT || 3000;
+const PORT = process.env.MMM_PORT || (isDevelopment ? 3001 : 3000);
 const MOI_API_BASE = 'https://webapi.moi.gov.eg';
+
 // Feature flag: set to 'false' to completely disable traffic sync
 const ENABLE_TRAFFIC_SYNC = process.env.ENABLE_TRAFFIC_SYNC !== 'false';
+
+// Environment-specific CORS configuration
+if (isDevelopment) {
+  // Development: Allow only Vite dev server
+  app.use(cors({
+    origin: 'http://localhost:5173',
+    credentials: true
+  }));
+} else {
+  // Production: Allow all origins
+  app.use(cors());
+}
+
 // Middleware
-app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.text());
 
-// Serve static files from dist folder (Vite build output)
-app.use(express.static(join(__dirname, '../dist')));
+// Production: Serve static files from dist folder (Vite build output)
+if (!isDevelopment) {
+  app.use(express.static(join(__dirname, '../dist')));
+}
 
 // Token endpoint - proxy to MOI token endpoint
 app.all('/token', async (req, res) => {
@@ -433,12 +451,20 @@ app.all('/api/*', async (req, res) => {
   }
 });
 
-// Serve index.html for all other routes (SPA fallback)
-app.get('*', (req, res) => {
-  res.sendFile(join(__dirname, '../dist/index.html'));
-});
+// Production: Serve index.html for all other routes (SPA fallback)
+if (!isDevelopment) {
+  app.get('*', (req, res) => {
+    res.sendFile(join(__dirname, '../dist/index.html'));
+  });
+}
 
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`Traffic sync: ${ENABLE_TRAFFIC_SYNC ? 'ENABLED' : 'DISABLED'}`);
+  if (isDevelopment) {
+    console.log(`Dev API server running on http://localhost:${PORT}`);
+    console.log(`Traffic sync: ${ENABLE_TRAFFIC_SYNC ? 'ENABLED' : 'DISABLED'}`);
+    console.log(`Configure your Vite dev server to proxy to this port`);
+  } else {
+    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Traffic sync: ${ENABLE_TRAFFIC_SYNC ? 'ENABLED' : 'DISABLED'}`);
+  }
 });
