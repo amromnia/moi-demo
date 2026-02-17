@@ -2,29 +2,136 @@ import express from 'express';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { chromium } from 'playwright';
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Detect environment: development or production
+const isDevelopment = process.env.NODE_ENV === 'development';
+
 const app = express();
-const PORT = process.env.MMM_PORT || 3000;
+const PORT = process.env.MMM_PORT || (isDevelopment ? 3001 : 3000);
 const MOI_API_BASE = 'https://webapi.moi.gov.eg';
+
 // Feature flag: set to 'false' to completely disable traffic sync
 const ENABLE_TRAFFIC_SYNC = process.env.ENABLE_TRAFFIC_SYNC !== 'false';
+
+// Retry configuration
+const MAX_RETRIES = 5;
+const RETRY_DELAY = 1000; // 1 second base delay
+
+/**
+ * Retry wrapper for fetch requests with exponential backoff
+ * Retries on transient errors (network issues, 500+ errors, empty responses, JSON parse errors)
+ * Does NOT retry on user-fixable errors (400-499)
+ */
+async function fetchWithRetry(url, options = {}, retryCount = 0) {
+  try {
+    const response = await fetch(url, options);
+    
+    // Check if we should retry based on status code
+    // Retry on 500+ (server errors) but not on 400-499 (client errors)
+    if (response.status >= 500 && retryCount < MAX_RETRIES) {
+      console.log(`Server error ${response.status}, retrying... (${retryCount + 1}/${MAX_RETRIES})`);
+      await sleep(RETRY_DELAY * Math.pow(2, retryCount)); // Exponential backoff
+      return fetchWithRetry(url, options, retryCount + 1);
+    }
+    
+    // Try to read the response
+    const text = await response.text();
+    
+    // Check for empty response (transient error)
+    if (!text || text.trim() === '') {
+      if (retryCount < MAX_RETRIES) {
+        console.log(`Empty response received, retrying... (${retryCount + 1}/${MAX_RETRIES})`);
+        await sleep(RETRY_DELAY * Math.pow(2, retryCount));
+        return fetchWithRetry(url, options, retryCount + 1);
+      }
+      // Return a response-like object for empty response
+      return {
+        ok: false,
+        status: response.status,
+        text: async () => '',
+        json: async () => { throw new Error('Empty response from server'); }
+      };
+    }
+    
+    // Try to parse as JSON if it looks like JSON
+    let jsonData = null;
+    if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
+      try {
+        jsonData = JSON.parse(text);
+      } catch (jsonError) {
+        // JSON parse error - this is a transient error, retry
+        if (retryCount < MAX_RETRIES) {
+          console.log(`JSON parse error, retrying... (${retryCount + 1}/${MAX_RETRIES})`);
+          await sleep(RETRY_DELAY * Math.pow(2, retryCount));
+          return fetchWithRetry(url, options, retryCount + 1);
+        }
+        // Max retries reached, throw the error
+        throw new Error('Invalid JSON response from server after multiple retries');
+      }
+    }
+    
+    // Return a response-like object with both text and json methods
+    return {
+      ok: response.ok,
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+      text: async () => text,
+      json: async () => jsonData || JSON.parse(text)
+    };
+    
+  } catch (error) {
+    // Network errors, connection issues - retry these
+    if (retryCount < MAX_RETRIES) {
+      console.log(`Network error: ${error.message}, retrying... (${retryCount + 1}/${MAX_RETRIES})`);
+      await sleep(RETRY_DELAY * Math.pow(2, retryCount));
+      return fetchWithRetry(url, options, retryCount + 1);
+    }
+    // Max retries reached, throw the error
+    throw error;
+  }
+}
+
+/**
+ * Sleep utility for retry delays
+ */
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Environment-specific CORS configuration
+if (isDevelopment) {
+  // Development: Allow only Vite dev server
+  app.use(cors({
+    origin: 'http://localhost:5173',
+    credentials: true
+  }));
+} else {
+  // Production: Allow all origins
+  app.use(cors());
+}
+
 // Middleware
-app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.text());
 
-// Serve static files from dist folder (Vite build output)
-app.use(express.static(join(__dirname, '../dist')));
+// Production: Serve static files from dist folder (Vite build output)
+if (!isDevelopment) {
+  app.use(express.static(join(__dirname, '../dist')));
+}
 
 // Token endpoint - proxy to MOI token endpoint
 app.all('/token', async (req, res) => {
   try {
-    const response = await fetch(`${MOI_API_BASE}/token`, {
+    const response = await fetchWithRetry(`${MOI_API_BASE}/token`, {
       method: req.method,
       headers: {
         'Content-Type': req.headers['content-type'] || 'application/x-www-form-urlencoded',
@@ -89,7 +196,7 @@ app.all('/api/proxy', async (req, res) => {
       }
     }
 
-    const response = await fetch(targetUrl, fetchOptions);
+    const response = await fetchWithRetry(targetUrl, fetchOptions);
     const data = await response.text();
     
     res.status(response.status);
@@ -110,126 +217,7 @@ app.all('/api/proxy', async (req, res) => {
   }
 });
 
-/**
- * Performs browser automation to complete traffic sync via login
- * @param {string} email - User's email
- * @param {string} password - User's password
- * @returns {Promise<{success: boolean, message?: string}>}
- */
-async function performBrowserLogin(email, password) {
-  let browser;
-  
-  try {
-    console.log('Starting browser automation for traffic login...');
-    
-    // Launch browser with realistic settings
-    browser = await chromium.launch({
-      headless: true,
-      args: [
-        '--disable-blink-features=AutomationControlled',
-        '--disable-dev-shm-usage',
-        '--no-sandbox'
-      ]
-    });
-    
-    const context = await browser.newContext({
-      viewport: { width: 1920, height: 1080 },
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36',
-      locale: 'ar-EG',
-      timezoneId: 'Africa/Cairo'
-    });
-    
-    // Add extra properties to make it look more like a real browser
-    await context.addInitScript(() => {
-      // Remove webdriver property
-      Object.defineProperty(navigator, 'webdriver', {
-        get: () => undefined
-      });
-      
-      // Add chrome property
-      window.chrome = {
-        runtime: {}
-      };
-      
-      // Add plugins
-      Object.defineProperty(navigator, 'plugins', {
-        get: () => [1, 2, 3, 4, 5]
-      });
-      
-      // Add languages
-      Object.defineProperty(navigator, 'languages', {
-        get: () => ['ar-EG', 'ar', 'en-US', 'en']
-      });
-    });
-    
-    const page = await context.newPage();
-    
-    // Navigate to login page
-    console.log('Navigating to login page...');
-    await page.goto('https://moi.gov.eg/Account/Login?ReturnUrl=https://traffic.moi.gov.eg/', {
-      waitUntil: 'networkidle',
-      timeout: 15000
-    });
-    
-    // Wait for page to fully load
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(2000); // Give extra time for any JS to execute
-    
-    // Fill in email
-    console.log('Filling in email...');
-    await page.fill('#Email', email);
-    await page.waitForTimeout(500);
-    
-    // Fill in password
-    console.log('Filling in password...');
-    await page.fill('#Password', password);
-    await page.waitForTimeout(500);
-    
-    // Click submit button
-    console.log('Clicking submit button...');
-    await page.click('#sb1');
-    
-    // Wait for navigation and redirects
-    console.log('Waiting for redirects to MyPage...');
-    await page.waitForURL('**/Arabic/Pages/MyPage.aspx**', {
-      timeout: 15000,
-      waitUntil: 'networkidle'
-    });
-    
-    console.log('Successfully reached MyPage, starting refresh cycles...');
-    
-    // Refresh the page 10 times
-    for (let i = 1; i <= 10; i++) {
-      console.log(`Refresh cycle ${i}/10  ...`);
-      await page.reload({
-        waitUntil: 'networkidle'
-      });
-      await page.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(2000); // Wait 2 seconds between refreshes
-    }
-    
-    console.log('Browser automation completed successfully');
-    
-    return {
-      success: true,
-      message: 'Browser login completed successfully'
-    };
-    
-  } catch (error) {
-    console.error('Browser automation error:', error);
-    return {
-      success: false,
-      message: 'Browser automation failed',
-      error: error.message
-    };
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
-  }
-}
-
-// Traffic service sync endpoint
+// Traffic service sync endpoint - using kiosk registration API
 app.post('/api/traffic-sync', async (req, res) => {
   // Check if traffic sync is enabled
   if (!ENABLE_TRAFFIC_SYNC) {
@@ -242,136 +230,252 @@ app.post('/api/traffic-sync', async (req, res) => {
   }
 
   try {
-    const { email, token, nationalityType, nationalId, password } = req.body;
-    
-    if (!email || !token || nationalityType === undefined || nationalityType === null || !nationalId || !password) {
-      console.error('Missing required fields:', { email: !!email, token: !!token, nationalityType, nationalId: !!nationalId, password: !!password });
-      return res.status(400).json({ 
+    const { memberId, accessToken } = req.body;
+
+    // Validate required fields
+    if (!memberId) {
+      return res.status(400).json({
         success: false,
-        error: 'Missing required fields',
-        required: ['email', 'token', 'nationalityType', 'nationalId', 'password']
+        message: 'معرف العضو مطلوب',
+        error: 'memberId is required'
       });
     }
 
-    if (typeof token !== 'string') {
-      console.error('Invalid token format:', { type: typeof token, length: token?.length });
-      return res.status(400).json({ 
+    if (!accessToken) {
+      return res.status(400).json({
         success: false,
-        error: 'Invalid token format',
-        message: 'رمز المصادقة غير صالح'
+        message: 'رمز المصادقة مطلوب',
+        error: 'accessToken is required'
       });
     }
 
-    const TRAFFIC_BASE = 'https://traffic.moi.gov.eg';
-    const referer = `${TRAFFIC_BASE}/Arabic/Pages/default.aspx?Email=${encodeURIComponent(email)}&Token=${encodeURIComponent(token)}`;
-    
-    // Common headers for all requests
-    const commonHeaders = {
-      'Accept': 'application/json, text/plain, */*',
-      'Accept-Language': 'en-US,en;q=0.9,ar;q=0.8',
-      'Content-Type': 'application/json',
-      'Origin': TRAFFIC_BASE,
-      'Referer': referer,
-      'sec-ch-ua': '"Not(A:Brand";v="8", "Chromium";v="144", "Google Chrome";v="144"',
-      'sec-ch-ua-mobile': '?0',
-      'sec-ch-ua-platform': '"Windows"',
-      'sec-fetch-dest': 'empty',
-      'sec-fetch-mode': 'cors',
-      'sec-fetch-site': 'same-origin',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36',
-      'X-Requested-With': 'XMLHttpRequest'
-    };
+    // Check environment variables
+    const baseUrl = process.env.TRAFFIC_SYNC_BASE_URL;
+    const username = process.env.TRAFFIC_SYNC_USERNAME;
+    const password = process.env.TRAFFIC_SYNC_PASSWORD;
 
-    // Step 1: ValidateUserLogin
-    const step1Body = { Email: email, Token: token };
-    const step1Response = await fetch(`${TRAFFIC_BASE}/Api/api/ExternalLogin/ValidateUserLogin`, {
+    if (!baseUrl || !username || !password) {
+      console.error('Missing environment variables:', {
+        hasBaseUrl: !!baseUrl,
+        hasUsername: !!username,
+        hasPassword: !!password
+      });
+      return res.status(500).json({
+        success: false,
+        message: 'خطأ في إعدادات الخادم',
+        error: 'Missing environment variables for traffic sync'
+      });
+    }
+
+    // Step 1: Get user profile data from MOI API
+    console.log('Step 1: Fetching user profile from MOI API...');
+    const profileResponse = await fetchWithRetry(
+      `${MOI_API_BASE}/api/MoiProfileApi/GetProfile?memberId=${memberId}`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (!profileResponse.ok) {
+      console.error('Failed to fetch user profile:', profileResponse.status);
+      
+      // Handle token expiration
+      if (profileResponse.status === 401) {
+        return res.status(401).json({
+          success: false,
+          message: 'انتهت صلاحية الجلسة، يرجى تسجيل الدخول مرة أخرى',
+          error: 'Token expired or invalid',
+          sessionExpired: true
+        });
+      }
+      
+      return res.status(500).json({
+        success: false,
+        message: 'فشل الحصول على بيانات المستخدم',
+        error: `Profile API returned status ${profileResponse.status}`
+      });
+    }
+
+    const profileData = await profileResponse.json();
+
+    if (profileData.status !== 1 || !profileData.data) {
+      console.error('Invalid profile data:', profileData);
+      return res.status(500).json({
+        success: false,
+        message: profileData.message || 'بيانات المستخدم غير صالحة',
+        error: 'Invalid profile response'
+      });
+    }
+
+    const profile = profileData.data;
+
+    // Extract required fields
+    const fullName = profile.fullName || profile.FullName || '';
+    const mobileNumber = profile.mobile || profile.Mobile || '';
+    const nationalId = profile.cardId || profile.NationalId || profile.PassportNumber || '';
+    const email = profile.email || profile.Email || '';
+
+    // Validate extracted data
+    if (!fullName) {
+      return res.status(400).json({
+        success: false,
+        message: 'الاسم الكامل غير موجود في ملف المستخدم',
+        error: 'Full name not found in profile'
+      });
+    }
+
+    if (!mobileNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'رقم الهاتف غير موجود في ملف المستخدم',
+        error: 'Mobile number not found in profile'
+      });
+    }
+
+    if (!nationalId) {
+      return res.status(400).json({
+        success: false,
+        message: 'رقم الهوية غير موجود في ملف المستخدم',
+        error: 'National ID not found in profile'
+      });
+    }
+
+    // Validate national ID format (must be exactly 14 digits)
+    if (!/^\d{14}$/.test(nationalId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'رقم الهوية يجب أن يكون 14 رقماً بالضبط',
+        error: 'National ID must be exactly 14 digits'
+      });
+    }
+
+    // Validate mobile number format (must be 11 digits starting with 010, 011, 012, or 015)
+    if (!/^(010|011|012|015)\d{8}$/.test(mobileNumber)) {
+      return res.status(400).json({
+        success: false,
+        message: 'رقم الهاتف غير صالح. يجب أن يبدأ بـ 010 أو 011 أو 012 أو 015 ويكون 11 رقماً',
+        error: 'Mobile number must be 11 digits starting with 010, 011, 012, or 015'
+      });
+    }
+
+    // Step 2: Authenticate with kiosk service
+    console.log('Step 2: Authenticating with kiosk service...');
+    const authResponse = await fetchWithRetry(`${baseUrl}/api/Auth/token`, {
       method: 'POST',
-      headers: commonHeaders,
-      body: JSON.stringify(step1Body)
-    });
-
-    const step1Text = await step1Response.text();
-
-    if (!step1Response.ok) {
-      console.error('Step 1 failed:', step1Response.status, step1Text);
-      return res.status(200).json({ 
-        success: false,
-        step: 'ValidateUserLogin',
-        status: step1Response.status,
-        message: 'فشل التحقق من بيانات المستخدم',
-        details: step1Text
-      });
-    }
-
-    // Step 2: ClaimSharePointUserLogin
-    const step2Response = await fetch(`${TRAFFIC_BASE}/_layouts/15/LINKDev.Traffic/ExternalLogin.aspx/ClaimSharePointUserLogin`, {
-      method: 'POST',
-      headers: commonHeaders,
-      body: JSON.stringify({ email: email })
-    });
-
-    const step2Text = await step2Response.text();
-
-    if (!step2Response.ok) {
-      console.error('Step 2 failed:', step2Response.status, step2Text);
-      return res.status(200).json({ 
-        success: false,
-        step: 'ClaimSharePointUserLogin',
-        status: step2Response.status,
-        message: 'فشل المصادقة مع SharePoint',
-        details: step2Text
-      });
-    }
-
-    // Step 3: ContinueValidateUserLogin
-    const step3Response = await fetch(`${TRAFFIC_BASE}/Api/api/ExternalLogin/ContinueValidateUserLogin`, {
-      method: 'POST',
-      headers: commonHeaders,
-      body: JSON.stringify({ 
-        NationalityType: nationalityType,
-        NationalId: nationalId 
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        username: username,
+        password: password
       })
     });
 
-    const step3Text = await step3Response.text();
-
-    if (!step3Response.ok) {
-      console.error('Step 3 failed:', step3Response.status, step3Text);
-      return res.status(200).json({ 
+    if (!authResponse.ok) {
+      console.error('Kiosk authentication failed:', authResponse.status);
+      return res.status(500).json({
         success: false,
-        step: 'ContinueValidateUserLogin',
-        status: step3Response.status,
-        message: 'فشل إكمال عملية التحقق',
-        details: step3Text
+        message: 'فشل المصادقة مع خدمة المرور',
+        error: `Authentication failed with status ${authResponse.status}`,
+        step: 'authentication'
       });
     }
 
-    // Step 4: Browser automation to complete the login flow
-    console.log('API steps completed, starting browser automation...');
-    const browserResult = await performBrowserLogin(email, password);
-    
-    if (!browserResult.success) {
-      console.error('Browser automation failed:', browserResult);
-      return res.status(200).json({ 
+    const authData = await authResponse.json();
+
+    // Check for successful authentication (statusCode: 0 = SUCCESS)
+    if (authData.statusCode !== 0 || !authData.success || !authData.result?.token) {
+      console.error('Invalid authentication response:', authData);
+      return res.status(500).json({
         success: false,
-        step: 'BrowserAutomation',
-        message: 'فشل إكمال عملية تسجيل الدخول',
-        details: browserResult.error
+        message: authData.message || 'فشل الحصول على رمز المصادقة',
+        error: 'Invalid authentication response',
+        step: 'authentication'
       });
     }
 
-    res.json({ 
-      success: true,
-      message: 'تمت المزامنة مع خدمة المرور بنجاح'
+    const token = authData.result.token;
+
+    // Step 3: Register/update user in kiosk service
+    console.log('Step 3: Registering user with kiosk service...');
+    const registerResponse = await fetchWithRetry(`${baseUrl}/api/User/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        fullName: fullName,
+        mobileNumber: mobileNumber,
+        nationalId: `${nationalId}`, // Ensure it's a string
+        email: email || undefined // Only include email if it exists
+      })
     });
+
+    if (!registerResponse.ok) {
+      console.error('User registration failed:', registerResponse.status);
+      const errorText = await registerResponse.text();
+      console.error('Registration error response:', errorText);
+      
+      return res.status(500).json({
+        success: false,
+        message: 'فشل تسجيل المستخدم في خدمة المرور',
+        error: `Registration failed with status ${registerResponse.status}`,
+        details: errorText,
+        step: 'registration'
+      });
+    }
+
+    const registerData = await registerResponse.json();
+
+    // Check registration result
+    if (registerData.statusCode === 0 && registerData.success) {
+      // Success
+      console.log('User registered successfully');
+      return res.status(200).json({
+        success: true,
+        message: 'تم التسجيل بنجاح في خدمة المرور'
+      });
+    } else if (registerData.statusCode === 4000) {
+      // Validation error
+      console.error('Validation error:', registerData);
+      return res.status(400).json({
+        success: false,
+        message: registerData.message || 'خطأ في التحقق من البيانات',
+        error: 'Validation error',
+        step: 'registration'
+      });
+    } else if (registerData.statusCode === 4001) {
+      // Authorization error
+      console.error('Authorization error:', registerData);
+      return res.status(401).json({
+        success: false,
+        message: registerData.message || 'خطأ في المصادقة',
+        error: 'Authorization error',
+        step: 'registration'
+      });
+    } else {
+      // Other error
+      console.error('Registration failed:', registerData);
+      return res.status(500).json({
+        success: false,
+        message: registerData.message || 'فشل التسجيل في خدمة المرور',
+        error: 'Registration failed',
+        step: 'registration'
+      });
+    }
 
   } catch (error) {
     console.error('Traffic sync error:', error);
-    res.status(200).json({ 
+    return res.status(500).json({
       success: false,
-      error: 'Traffic sync error',
-      message: 'حدث خطأ أثناء المزامنة مع خدمة المرور',
-      details: error.message
+      message: 'حدث خطأ غير متوقع',
+      error: error.message
     });
   }
 });
@@ -412,7 +516,7 @@ app.all('/api/*', async (req, res) => {
       }
     }
 
-    const response = await fetch(targetUrl, fetchOptions);
+    const response = await fetchWithRetry(targetUrl, fetchOptions);
     const data = await response.text();
     
     res.status(response.status);
@@ -433,12 +537,20 @@ app.all('/api/*', async (req, res) => {
   }
 });
 
-// Serve index.html for all other routes (SPA fallback)
-app.get('*', (req, res) => {
-  res.sendFile(join(__dirname, '../dist/index.html'));
-});
+// Production: Serve index.html for all other routes (SPA fallback)
+if (!isDevelopment) {
+  app.get('*', (req, res) => {
+    res.sendFile(join(__dirname, '../dist/index.html'));
+  });
+}
 
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`Traffic sync: ${ENABLE_TRAFFIC_SYNC ? 'ENABLED' : 'DISABLED'}`);
+  if (isDevelopment) {
+    console.log(`Dev API server running on http://localhost:${PORT}`);
+    console.log(`Traffic sync: ${ENABLE_TRAFFIC_SYNC ? 'ENABLED' : 'DISABLED'}`);
+    console.log(`Configure your Vite dev server to proxy to this port`);
+  } else {
+    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Traffic sync: ${ENABLE_TRAFFIC_SYNC ? 'ENABLED' : 'DISABLED'}`);
+  }
 });
