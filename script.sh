@@ -57,6 +57,7 @@ fi
 echo "Restarting PM2..."
 pm2 restart all
 pm2 restart all --update-env
+pm2 list
 
 echo ""
 echo "================================="
