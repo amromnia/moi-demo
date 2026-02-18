@@ -14,7 +14,7 @@ fi
 PASSWORD="$1"
 
 # Array of protocols to test
-protocols=("https" "http")
+protocols=("http")
 
 for proto in "${protocols[@]}"; do
   URL="$proto://$HOST/api/Auth/token"
