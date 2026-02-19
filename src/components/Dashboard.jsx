@@ -41,7 +41,7 @@ function Dashboard() {
         syncInitiatedRef.current = true;
         handleTrafficSync(currentUser);
       } else if (!needsTrafficSync()) {
-        setTrafficSync({ status: 'success', message: 'تم التحقق من حسابك' });
+        setTrafficSync({ status: 'success', message: 'اكتملت العملية' });
       }
     } else {
       setTrafficSync({ status: 'idle', message: '' });
@@ -53,7 +53,7 @@ function Dashboard() {
       userData = user;
     }
 
-    setTrafficSync({ status: 'syncing', message: 'جاري التحقق من الحساب… لا تغلق الصفحة، قد تستغرق العملية حتى دقيقتين.' });
+    setTrafficSync({ status: 'syncing', message: 'جاري معالجة البيانات… لا تغلق الصفحة، قد تستغرق العملية حتى دقيقتين.' });
 
     try {
       const memberId = userData.memberId;
@@ -84,7 +84,7 @@ function Dashboard() {
         markTrafficSynced();
         setTrafficSync({ 
           status: 'success', 
-          message: 'تم التحقق من حسابك بنجاح' 
+          message: 'اكتملت العملية بنجاح' 
         });
       } else {
         // Check if session expired
@@ -97,7 +97,7 @@ function Dashboard() {
         console.error('Traffic sync failed:', result);
         setTrafficSync({ 
           status: 'error', 
-          message: result.message || 'فشل التحقق من الحساب',
+          message: result.message || 'فشلت العملية',
           details: result.details,
           step: result.step
         });
@@ -167,7 +167,7 @@ function Dashboard() {
           {ENABLE_TRAFFIC_SYNC && trafficSync.status !== 'idle' && (
             <div className={`sync-status sync-${trafficSync.status}`}>
               <div className="sync-header">
-                <h4>حالة التحقق من خدمة المرور</h4>
+                <h4>حالة العملية</h4>
                 {trafficSync.status === 'syncing' && (
                   <span className="spinner"></span>
                 )}
