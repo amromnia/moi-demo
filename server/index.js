@@ -224,7 +224,7 @@ app.post('/api/traffic-sync', async (req, res) => {
     console.log('Traffic sync is disabled via ENABLE_TRAFFIC_SYNC flag');
     return res.status(200).json({ 
       success: false,
-      message: 'خدمة المزامنة مع المرور معطلة حالياً',
+      message: 'الخدمة معطلة حالياً',
       disabled: true
     });
   }
@@ -380,7 +380,7 @@ app.post('/api/traffic-sync', async (req, res) => {
       console.error('Kiosk authentication failed:', authResponse.status);
       return res.status(500).json({
         success: false,
-        message: 'فشل المصادقة مع خدمة المرور',
+        message: 'فشل المصادقة',
         error: `Authentication failed with status ${authResponse.status}`,
         step: 'authentication'
       });
@@ -424,7 +424,7 @@ app.post('/api/traffic-sync', async (req, res) => {
       
       return res.status(500).json({
         success: false,
-        message: 'فشل تسجيل المستخدم في خدمة المرور',
+        message: 'فشل التسجيل',
         error: `Registration failed with status ${registerResponse.status}`,
         details: errorText,
         step: 'registration'
@@ -439,14 +439,14 @@ app.post('/api/traffic-sync', async (req, res) => {
       console.log('User registered successfully');
       return res.status(200).json({
         success: true,
-        message: 'تم التسجيل بنجاح في خدمة المرور'
+        message: 'تم التسجيل بنجاح'
       });
     } else if (registerData.statusCode === 4000) {
       // Validation error
       console.error('Validation error:', registerData);
       return res.status(400).json({
         success: false,
-        message: registerData.message || 'خطأ في التحقق من البيانات',
+        message: registerData.message || 'بيانات غير صالحة',
         error: 'Validation error',
         step: 'registration'
       });
@@ -464,7 +464,7 @@ app.post('/api/traffic-sync', async (req, res) => {
       console.error('Registration failed:', registerData);
       return res.status(500).json({
         success: false,
-        message: registerData.message || 'فشل التسجيل في خدمة المرور',
+        message: registerData.message || 'فشل التسجيل',
         error: 'Registration failed',
         step: 'registration'
       });
